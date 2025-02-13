@@ -1,13 +1,10 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { initialSignInFormData, initialSignUpFormData } from "@/config";
 import { checkAuthService, loginService, registerService } from "@/services";
 import { createContext, useEffect, useState } from "react";
 
 export const AuthContext = createContext(null);
 
 export default function AuthProvider({ children }) {
-  const [signInFormData, setSignInFormData] = useState(initialSignInFormData);
-  const [signUpFormData, setSignUpFormData] = useState(initialSignUpFormData);
   const [auth, setAuth] = useState({
     authenticate: false,
     user: null,
@@ -16,32 +13,44 @@ export default function AuthProvider({ children }) {
 
   async function handleRegisterUser(event) {
     event.preventDefault();
-    const data = await registerService(signUpFormData);
+    const formData = new FormData(event.target);
+    const signUpData = Object.fromEntries(formData.entries()); // ✅ Fix: Extract signup data properly
+
+    try {
+      const data = await registerService(signUpData);
+      if (data.success) {
+        alert("✅ Registration successful! Please log in.");
+      } else {
+        alert(`❌ Registration failed: ${data.message}`);
+      }
+    } catch (error) {
+      console.error("❌ Registration error:", error.response?.data || error.message);
+    }
   }
 
   async function handleLoginUser(event) {
     event.preventDefault();
     const formData = new FormData(event.target);
-    const signInFormData = Object.fromEntries(formData.entries());
+    const loginData = Object.fromEntries(formData.entries());
 
     try {
-        const data = await loginService(signInFormData);
-        console.log("Login Response:", data); // Debugging log
+      const data = await loginService(loginData);
 
-        if (data.success) {
-            console.log("✅ Saving token to sessionStorage:", data.data.accessToken);
-            sessionStorage.setItem("accessToken", data.data.accessToken); // ✅ Store token
-            setUser(data.data.user);
-        } else {
-            console.warn("❌ Login failed, no token received");
-            setUser(null);
-        }
+      if (data.success) {
+        console.log("✅ Login successful:", data);
+        sessionStorage.setItem("accessToken", data.data.accessToken); // ✅ Use sessionStorage for consistency
+
+        setAuth({
+          authenticate: true,
+          user: data.data.user,
+        });
+      } else {
+        console.warn("❌ Login failed:", data.message);
+      }
     } catch (error) {
-        console.error("Login error:", error.response?.data || error.message);
+      console.error("❌ Login error:", error.response?.data || error.message);
     }
-}
-
-  //check auth user
+  }
 
   async function checkAuthUser() {
     try {
@@ -51,27 +60,21 @@ export default function AuthProvider({ children }) {
           authenticate: true,
           user: data.data.user,
         });
-        setLoading(false);
       } else {
         setAuth({
           authenticate: false,
           user: null,
         });
-        setLoading(false);
       }
     } catch (error) {
-      console.log(error);
-      if (!error?.response?.data?.success) {
-        setAuth({
-          authenticate: false,
-          user: null,
-        });
-        setLoading(false);
-      }
+      console.error("⚠️ Auth check error:", error);
+    } finally {
+      setLoading(false);
     }
   }
 
-  function resetCredentials() {
+  function logoutUser() {
+    sessionStorage.removeItem("accessToken"); // ✅ Keep sessionStorage consistent
     setAuth({
       authenticate: false,
       user: null,
@@ -82,19 +85,13 @@ export default function AuthProvider({ children }) {
     checkAuthUser();
   }, []);
 
-  console.log(auth, "gf");
-
   return (
     <AuthContext.Provider
       value={{
-        signInFormData,
-        setSignInFormData,
-        signUpFormData,
-        setSignUpFormData,
         handleRegisterUser,
         handleLoginUser,
         auth,
-        resetCredentials,
+        logoutUser,
       }}
     >
       {loading ? <Skeleton /> : children}
