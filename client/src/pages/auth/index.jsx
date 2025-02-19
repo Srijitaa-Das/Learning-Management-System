@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { registerService, loginService } from "@/services";  // ✅ Fixed import
+import { registerService, loginService } from "@/services/index";  // ✅ Fixed import
 import CommonForm from "@/components/common-form";
 import {
   signUpFormControls,
